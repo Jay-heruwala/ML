@@ -1,0 +1,63 @@
+# Logistic Regression on Breast Cancer Dataset
+import pandas
+# 1. Import libraries
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.metrics import log_loss
+
+
+pandas.set_option("display.max_row",None)
+pandas.set_option("display.max_column",None)
+
+# 2. Load dataset
+df = pd.read_csv("Prostate_Cancer_Dataset.csv")
+
+# 3. Encode target column (M=1, B=0)
+label_encoder = LabelEncoder()
+df["diagnosis_result"] = label_encoder.fit_transform(df["diagnosis_result"])
+
+# 4. Features (X) and Target (y)
+X = df.drop("diagnosis_result", axis=1)
+y = df["diagnosis_result"]
+
+# 5. Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# 6. Feature Scaling
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# 7. Train Logistic Regression Model
+model = LogisticRegression(max_iter=500)
+model.fit(X_train_scaled, y_train)
+
+# 8. Predictions
+y_pred = model.predict(X_test_scaled)
+
+result = pd.DataFrame(
+    {
+        "y_test" : y_test,
+        "y_predict":y_pred
+    }
+)
+
+# 9. Evaluation
+print("Model Accuracy:", accuracy_score(y_test, y_pred))
+print("\nConfusion Matrix:\n", confusion_matrix(y_test, y_pred))
+# print("\nClassification Report:\n", classification_report(y_test, y_pred))
+
+# Get probability predictions instead of hard class labels
+y_pred_proba = model.predict_proba(X_test_scaled)
+
+print(y_pred_proba)
+
+
+# Compute log loss
+loss = log_loss(y_test, y_pred_proba)
+print("Log Loss:", loss)
