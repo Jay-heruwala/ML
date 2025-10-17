@@ -1,0 +1,155 @@
+# ==============================
+# Linear Regression on Wine Quality Dataset
+# Includes: correlation, outlier detection, regression, evaluation, plots
+# ==============================
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import (
+    mean_squared_error, mean_absolute_error, r2_score,
+    explained_variance_score, mean_squared_log_error
+)
+from scipy.stats import pearsonr, zscore
+
+# ------------------------------
+# 1. Load dataset
+# ------------------------------
+file_path = "../../Dataset/winequality-red1.csv"   # <-- Change to your file path
+df = pd.read_csv(file_path)
+
+print("Dataset shape:", df.shape)
+print("Columns:", df.columns.tolist())
+print(df.head())
+
+# ------------------------------
+# 2. Correlation
+# ------------------------------
+corr = df.corr()
+print("\nCorrelation with target (quality):\n", corr["quality"].sort_values(ascending=False))
+
+# Heatmap
+plt.figure(figsize=(8,6))
+plt.title("Correlation Heatmap")
+plt.imshow(corr.values, cmap="coolwarm", aspect='auto')
+plt.colorbar()
+plt.xticks(range(len(corr.columns)), corr.columns, rotation=90)
+plt.yticks(range(len(corr.columns)), corr.columns)
+plt.tight_layout()
+plt.show()
+
+# ------------------------------
+# 3. Outlier detection
+# ------------------------------
+X = df.drop(columns=["quality"])
+y = df["quality"]
+
+# Z-score method
+z_scores = np.abs(zscore(X))
+z_outliers_mask = (z_scores > 3).any(axis=1)
+print(f"Z-score outliers: {z_outliers_mask.sum()} rows")
+
+# IQR method
+Q1, Q3 = X.quantile(0.25), X.quantile(0.75)
+IQR = Q3 - Q1
+lower, upper = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
+iqr_outliers_mask = ((X < lower) | (X > upper)).any(axis=1)
+print(f"IQR outliers: {iqr_outliers_mask.sum()} rows")
+
+for col in X.columns:
+    Q1, Q3 = X[col].quantile([0.25, 0.75])
+    IQR = Q3 - Q1
+    lower, upper = Q1 - 1.5 * IQR, Q3 + 1.5 * IQR
+
+    # Clip values to lower/upper bounds
+    X[col] = X[col].clip(lower, upper)
+
+# Boxplot for features
+plt.figure(figsize=(10,6))
+plt.title("Boxplot of Features")
+plt.boxplot([X[col].values for col in X.columns], tick_labels=X.columns, vert=True)
+plt.xticks(rotation=90)
+plt.tight_layout()
+plt.show()
+
+# ------------------------------
+# 4. Train-test split & scaling
+# ------------------------------
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+
+# ------------------------------
+# 5. Train Linear Regression
+# ------------------------------
+lr = LinearRegression()
+lr.fit(X_train_scaled, y_train)
+y_pred = lr.predict(X_test_scaled)
+
+# ------------------------------
+# 6. Evaluation metrics
+# ------------------------------
+r_value, r_p = pearsonr(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+mse = mean_squared_error(y_test, y_pred)
+rmse = np.sqrt(mse)
+mae = mean_absolute_error(y_test, y_pred)
+msle = mean_squared_log_error(y_test, np.maximum(y_pred, 0))  # avoid negatives
+explained_var = explained_variance_score(y_test, y_pred)
+
+print("\nEvaluation Metrics:")
+print(f"Pearson r: {r_value:.4f} (p={r_p:.4e})")
+print(f"R2 Score: {r2:.4f}")
+print(f"MSE: {mse:.4f}")
+print(f"RMSE: {rmse:.4f}")
+print(f"MAE: {mae:.4f}")
+print(f"MSLE: {msle:.4f}")
+print(f"Explained Variance: {explained_var:.4f}")
+
+# ------------------------------
+# 7. Coefficients (importance)
+# ------------------------------
+coefficients = pd.DataFrame({
+    "Feature": X.columns,
+    "Coefficient": lr.coef_
+})
+coefficients["AbsCoef"] = coefficients["Coefficient"].abs()
+coefficients = coefficients.sort_values(by="AbsCoef", ascending=False)
+print("\nFeature importance (standardized coefficients):\n", coefficients)
+
+# ------------------------------
+# 8. Plots
+# ------------------------------
+# Predicted vs Actual
+plt.figure(figsize=(6,6))
+plt.scatter(y_test, y_pred, alpha=0.7)
+plt.plot([y.min(), y.max()], [y.min(), y.max()], 'r--')
+plt.xlabel("Actual Quality")
+plt.ylabel("Predicted Quality")
+plt.title("Predicted vs Actual")
+plt.show()
+
+# Residuals
+residuals = y_test - y_pred
+plt.figure(figsize=(6,4))
+plt.hist(residuals, bins=30, edgecolor="black")
+plt.xlabel("Residual")
+plt.ylabel("Frequency")
+plt.title("Residual Distribution")
+plt.show()
+
+# Top feature scatter
+top_feature = coefficients.iloc[0]["Feature"]
+plt.figure(figsize=(6,4))
+plt.scatter(df[top_feature], df["quality"], alpha=0.6)
+plt.xlabel(top_feature)
+plt.ylabel("Quality")
+plt.title(f"Scatter: {top_feature} vs Quality")
+plt.show()
