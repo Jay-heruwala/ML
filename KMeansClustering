@@ -1,0 +1,110 @@
+# ===============================
+# 1. Import required libraries
+# ===============================
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from pyexpat import features
+from sklearn.datasets import load_iris
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+from sklearn.decomposition import PCA
+
+
+# ===============================
+# 2. Load the dataset
+# ===============================
+
+iris = load_iris()
+X = iris.data
+y = iris.target
+feature_names = iris.feature_names
+
+# print(feature_names)
+df = pd.DataFrame(X, columns=feature_names)
+# print("Sample data:")
+# print(df.head())
+
+
+# ===============================
+# 3. Scale the data
+# ===============================
+# Scaling is important so that each feature contributes equally
+# scaler = StandardScaler()
+# X_scaled = scaler.fit_transform(X)
+
+
+# ===============================
+# 3. Optional: Use PCA for dimensionality reduction (for visualization)
+#    IMPORTANT: We'll still do clustering on the full scaled data.
+# ===============================
+pca = PCA(n_components=2, random_state=42)
+X_scaled = pca.fit_transform(X)  # 2D representation of the data
+
+print("\nExplained variance ratio of the 2 PCA components:")
+print(pca.explained_variance_ratio_)  # how much variance each component captures
+
+
+print(X_scaled)
+# ===============================
+# 4. Apply K-Means clustering
+# ===============================
+# Let's try clustering for different k values
+inertia_list = []
+silhouette_list = []
+K = range(2, 15)
+
+for k in K:
+    kmeans = KMeans(n_clusters=k, random_state=42)
+    kmeans.fit(X_scaled)
+    inertia_list.append(kmeans.inertia_)
+    silhouette_list.append(silhouette_score(X_scaled, kmeans.labels_))
+
+# ===============================
+# 5. Evaluate the clusters
+# ===============================
+plt.figure(figsize=(12, 5))
+
+plt.subplot(1, 2, 1)
+plt.plot(K, inertia_list, 'o-', color='blue')
+plt.title('Elbow Method')
+plt.xlabel('Number of clusters (k)')
+plt.ylabel('Inertia')
+
+plt.subplot(1, 2, 2)
+plt.plot(K, silhouette_list, 'o-', color='green')
+plt.title('Silhouette Score')
+plt.xlabel('Number of clusters (k)')
+plt.ylabel('Score')
+
+plt.show()
+
+# ===============================
+# 6. Choose optimal k and fit final model
+# ===============================
+k_optimal = 3  # based on elbow or silhouette analysis
+kmeans_final = KMeans(n_clusters=k_optimal, random_state=42)
+kmeans_final.fit(X_scaled)
+centroids = kmeans_final.cluster_centers_
+
+# Add cluster labels to the DataFrame
+df['Cluster'] = kmeans_final.labels_
+
+print("\nClustered Data:")
+print(df.head())
+
+# ===============================
+# 7. Visualize the clusters
+# ===============================
+plt.figure(figsize=(7, 5))
+plt.scatter(X_scaled[:, 0], X_scaled[:, 1], c=kmeans_final.labels_, cmap='viridis', s=50)
+plt.scatter(centroids[:, 0], centroids[:, 1], c='red', marker='x', s=200, label='Centroids')
+plt.title('K-Means Clustering (k=3)')
+plt.xlabel('Feature 1 (scaled)')
+plt.ylabel('Feature 2 (scaled)')
+plt.show()
+
+
+# Cluster plot
+
